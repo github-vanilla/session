@@ -7,21 +7,22 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.43/Tone.js"></script>
     </head>
     <body>
-        <p id="roomid"></p>
-        <div id="note"></div>
+        <p id="peerid"></p>
 
         <input type="button" id="button_create" value="Create Room">
-        <input type="text" id="input_roomid" placeholder="Room ID">
+        <input type="text" id="input_peerid" placeholder="Room ID">
         <input type="button" id="button_join" value="Join">
+
+        <div id="info"></div>
     </body>
 
     <script>
         // ↓------------------------------- グローバル変数 -------------------------------↓
 
         // ロビーで使われている部品を取得
-        let button_create = document.getElementById('button_create');   // 部屋作成ボタン
-        let text_roomid = document.getElementById('input_roomid');      // RoomID入力フィールド
-        let button_join = document.getElementById('button_join');       // 部屋参加ボタン
+        let button_create = document.getElementById("button_create");   // 部屋作成ボタン
+        let text_peerid = document.getElementById("input_peerid");      // peerID入力フィールド
+        let button_join = document.getElementById("button_join");       // 部屋参加ボタン
 
         // P2Pの接続状態をグローバル変数で保持
         let connection;
@@ -29,7 +30,7 @@
         // ↓------------------------------- ネットワーク系 -------------------------------↓
 
         // 部屋作成ボタン押下時
-        document.getElementById('button_create').onclick = () => {
+        document.getElementById("button_create").onclick = () => {
             // Peer作成
             const peer = new Peer(String(Math.floor(Math.random()*900000+100000)), {
                 key: '59214ca8-9cee-4bde-b61d-3d7343c52205',
@@ -37,22 +38,22 @@
             });
 
             // Peer作成成功時
-            peer.on('open', () => {
-                document.getElementById('roomid').textContent = "RoomID: " + peer.id;
+            peer.on("open", () => {
+                document.getElementById('peerid').textContent = "RoomID: " + peer.id;
                 button_create.remove();
-                text_roomid.remove();
+                text_peerid.remove();
                 button_join.remove();
             });
 
             // 他のPeerが接続してきたとき
-            peer.on('connection', conn => {
+            peer.on("connection", conn => {
                 connection = conn;
             });
         };
 
         // 入室ボタン押下時
-        document.getElementById('button_join').onclick = () => {
-            let roomid = document.getElementById('input_roomid').value;
+        document.getElementById("button_join").onclick = () => {
+            let peerid = document.getElementById("input_peerid").value;
 
             // Peer作成
             const peer = new Peer({
@@ -61,30 +62,27 @@
             });
 
             // Peer作成成功時
-            peer.on('open', () => {
+            peer.on("open", () => {
                 // 該当するPeerへ接続
-                connection = peer.connect(roomid);
+                connection = peer.connect(peerid);
 
                 // Peer接続成功時
-                connection.on('open', () => {
-                    document.getElementById('roomid').textContent = "RoomID: " + roomid;
+                connection.on("open", () => {
+                    document.getElementById("peerid").textContent = "peerID: " + peerid;
                     button_create.remove();
-                    text_roomid.remove();
+                    text_peerid.remove();
                     button_join.remove();
                 });
 
                 // 接続失敗時
-                peer.on('error', error => {
-                    alert("RoomID: " + roomid + " の部屋は存在していません : " + error);
+                peer.on("error", error => {
+                    alert("peerID: " + peerid + " の部屋は存在していません : " + error);
                     document.location.reload();
                 });
 
                 // データ受信時
-                connection.on('data', data => {
-                    hex = data.slice(3, 5);
-                    document.getElementById('note').innerHTML = hex;
-                    vel = parseInt(data.slice(6, 8), 16);
-                    if(data[0] != '8') play(hex, vel);
+                connection.on("data", data => {
+                    play(data);
                 });
             })
         };
@@ -113,15 +111,14 @@
         // MIDI機器からの入力を受け取る
         function handleMIDIMessage(event){
             if(event.data.length > 1){
-                s = event.data[0].toString(16) + " ";
+                s = event.data[0].toString(16) + ' ';
                 for(i = 1; i < event.data.length; i++){
-                    if(event.data[i] < 0x10) s += "0";
-                    s += event.data[i].toString(16) + " ";
+                    if(event.data[i] < 0x10) s += '0';
+                    s += event.data[i].toString(16) + ' ';
                 }
                 if(connection) connection.send(s);  // 無加工のデータを相手にも送信する
-                hex = s.slice(3, 5)  // 入力キーを16進数(文字列型)として受け取る
-                vel = parseInt(s.slice(6, 8), 16);    // 入力キーの押す速さを10進数として受け取る
-                play(hex, vel); // 指定された音高と強さで再生する
+                play(s);
+                //document.getElementById("info").innerHTML = s;
             }
         }
 
@@ -129,9 +126,9 @@
         function hex_to_note(hex){
             t = parseInt(hex, 16)-21;
             res = "ABBCDDEEFGGA"[t%12];
-            if([1, 4, 6, 9, 11].includes(t%12)) res += "b";
-            if(t < 3) res += "0";
-            else if(t > 86) res += "8";
+            if([1, 4, 6, 9, 11].includes(t%12)) res += 'b';
+            if(t < 3) res += '0';
+            else if(t > 86) res += '8';
             else if(res[0] != 'B') res += String(Math.ceil(t/12));
             else res += String(Math.ceil(t/12)-1);
             return res
@@ -144,15 +141,36 @@
             urls: {
                 C4: "20200822172728_625a42455a466b4b5a46.mp3",
             },
+            release: 0.6,
             baseUrl: "https://f.easyuploader.app/eu-prd/upload/",
-        }).toDestination();
+        }).toMaster();
 
-        // 指定された音高と強さでサンプラー音源を再生する
-        function play(hex, vel){
-            velocity = parseInt(vel, 16);
-            if(velocity > 0){
-                sampler.triggerAttackRelease(hex_to_note(hex), 6, Tone.context.currentTime, Math.min(velocity*velocity/2000, 4));
+        sustain = false;
+
+        function play(data){
+            if(data[0] == 'b'){     // サステインペダル押下時
+                sustain = parseInt(data.slice(6, 8), 16) > 0;
+                if(!sustain) sampler.triggerRelease(allnotes(), Tone.context.currentTime);
+            }else{                  // キー入力時
+                hex = data.slice(3, 5);
+                vel = parseInt(data.slice(6, 8), 16);
+                if(data[0] != '8' && vel != 0) sampler.triggerAttack(hex_to_note(hex), Tone.context.currentTime, Math.min(vel*vel/2000, 4));
+                else if(!sustain) sampler.triggerRelease(hex_to_note(hex), Tone.context.currentTime);
             }
+        }
+
+        function allnotes(){
+            res = [];
+            for(var t = 0; t < 88; t++){
+                note = "ABBCDDEEFGGA"[t%12];
+                if([1, 4, 6, 9, 11].includes(t%12)) note += "b";
+                if(t < 3) note += "0";
+                else if(t > 86) note += "8";
+                else if(res[0] != 'B') note += String(Math.ceil(t/12));
+                else note += String(Math.ceil(t/12)-1);
+                res.push(note);
+            }
+            return res;
         }
     </script>
 </html>
