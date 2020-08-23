@@ -145,7 +145,7 @@
                     console.log(data);
                     hex = data[3] + data[4];
                     vel = parseInt(data[6] + data[7], 16);
-                    play(hex, vel);
+                    if(data[0] != '8') play(hex, vel);
                 });
             })
         };
