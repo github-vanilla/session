@@ -65,7 +65,7 @@
                 connection = peer.connect(peerid);
 
                 // Peer接続成功時
-                connection.on("open", () => {
+                connection.on("open", ()  => {
                     document.getElementById("peerid").textContent = "RoomID: " + peerid;
                     button_create.remove();
                     text_peerid.remove();
@@ -80,6 +80,7 @@
 
                 // データ受信時
                 connection.on("data", data => {
+                    console.log(data);
                     play(data);
                 });
             })
