@@ -44,7 +44,16 @@
             });
 
             // 他のPeerが接続してきたとき
-            peer.on("connection", conn => {
+            /*peer.on("connection", conn => {
+                connection = conn;
+            });*/
+            peer.on('connection', conn => {
+                // データ受信時
+                conn.on('data', data => {
+                    console.log(data);
+                    play(data);
+                });
+
                 connection = conn;
             });
         };
