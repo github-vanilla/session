@@ -12,8 +12,6 @@
         <input type="button" id="button_create" value="Create Room">
         <input type="text" id="input_peerid" placeholder="Room ID">
         <input type="button" id="button_join" value="Join">
-
-        <div id="info"></div>
     </body>
 
     <script>
@@ -68,7 +66,7 @@
 
                 // Peer接続成功時
                 connection.on("open", () => {
-                    document.getElementById("peerid").textContent = "peerID: " + peerid;
+                    document.getElementById("peerid").textContent = "RoomID: " + peerid;
                     button_create.remove();
                     text_peerid.remove();
                     button_join.remove();
@@ -76,7 +74,7 @@
 
                 // 接続失敗時
                 peer.on("error", error => {
-                    alert("peerID: " + peerid + " の部屋は存在していません : " + error);
+                    alert("RoomID: " + peerid + " の部屋は存在していません : " + error);
                     document.location.reload();
                 });
 
@@ -118,7 +116,6 @@
                 }
                 if(connection) connection.send(s);  // 無加工のデータを相手にも送信する
                 play(s);
-                //document.getElementById("info").innerHTML = s;
             }
         }
 
@@ -143,7 +140,7 @@
             },
             release: 0.6,
             baseUrl: "https://f.easyuploader.app/eu-prd/upload/",
-        }).toMaster();
+        }).toDestination();
 
         sustain = false;
 
