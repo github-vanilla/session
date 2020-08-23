@@ -1,28 +1,98 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MIDI Live</title>
         <script src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.43/Tone.js"></script>
-        <title>MIDI SESSION</title>
     </head>
     <body>
-        <p id="my_id"></p>
-        <input type="button" id="button_create" value="Create Room"><br>
-        <input type="text" id="input_id" placeholder="RoomID">
+        <p id="roomid"></p>
+
+        <input type="button" id="button_create" value="Create Room">
+        <input type="text" id="input_roomid" placeholder="Room ID">
         <input type="button" id="button_join" value="Join">
-        <pre id="log"></pre>
     </body>
 
     <script>
-        let button_create = document.getElementById('button_create');
-        let input_id = document.getElementById('input_id');
-        let button_join = document.getElementById('button_join');
+        // ↓------------------------------- グローバル変数 -------------------------------↓
+
+        // ロビーで使われている部品を取得
+        let button_create = document.getElementById('button_create');   // 部屋作成ボタン
+        let text_roomid = document.getElementById('input_roomid');      // RoomID入力フィールド
+        let button_join = document.getElementById('button_join');       // 部屋参加ボタン
+
+        // P2Pの接続状態をグローバル変数で保持
         let connection;
 
+        // ↓------------------------------- ネットワーク系 -------------------------------↓
+
+        // 部屋作成ボタン押下時
+        document.getElementById('button_create').onclick = () => {
+            // Peer作成
+            const peer = new Peer(String(Math.floor(Math.random()*900000+100000)), {
+                key: '59214ca8-9cee-4bde-b61d-3d7343c52205',
+                debug: 0
+            });
+
+            // Peer作成成功時
+            peer.on('open', () => {
+                document.getElementById('roomid').textContent = "RoomID: " + peer.id;
+                button_create.remove();
+                text_roomid.remove();
+                button_join.remove();
+            });
+
+            // 他のPeerが接続してきたとき
+            peer.on('connection', conn => {
+                connection = conn;
+            });
+        };
+
+        // 入室ボタン押下時
+        document.getElementById('button_join').onclick = () => {
+            let roomid = document.getElementById('input_roomid').value;
+
+            // Peer作成
+            const peer = new Peer({
+                key: '59214ca8-9cee-4bde-b61d-3d7343c52205',
+                debug: 3
+            });
+
+            // Peer作成成功時
+            peer.on('open', () => {
+                // 該当するPeerへ接続
+                connection = peer.connect(roomid);
+
+                // Peer接続成功時
+                connection.on('open', () => {
+                    document.getElementById('roomid').textContent = "RoomID: " + roomid;
+                    button_create.remove();
+                    text_roomid.remove();
+                    button_join.remove();
+                });
+
+                // 接続失敗時
+                peer.on('error', error => {
+                    alert("RoomID: " + roomid + " doesn't exsist.");
+                    document.location.reload();
+                });
+
+                // データ受信時
+                connection.on('data', data => {
+                    hex = data.slice(3, 5);
+                    vel = parseInt(data.slice(6, 8), 16);
+                    if(data[0] != '8') play(hex, vel);
+                });
+            })
+        };
+
+        // ↓------------------------------- MIDI系 -------------------------------↓
+
+        // MIDI機器の権限を求める
         navigator.requestMIDIAccess({sysex: true}).then(success, failure);
 
+        // MIDI機器の権限取得成功
         function success(midiAccess){
             itr = midiAccess.inputs.values();
             inputs = [];
@@ -33,28 +103,27 @@
             }, 200);
         }
 
+        // MIDI機器の権限取得失敗
         function failure(error){
-            alert("Couldn't detect MIDI input devices. / " + error);
+            alert("MIDI機器を検出できませんでした : " + error);
         }
 
+        // MIDI機器からの入力を受け取る
         function handleMIDIMessage(event){
-            str = null;
             if(event.data.length > 1){
-                str = event.data[0].toString(16) + " ";
+                s = event.data[0].toString(16) + " ";
                 for(i = 1; i < event.data.length; i++){
-                    if(event.data[i] < 0x10) str += "0";
-                    str += event.data[i].toString(16) + " ";
+                    if(event.data[i] < 0x10) s += "0";
+                    s += event.data[i].toString(16) + " ";
                 }
-            }
-
-            if(str != null){
-                send(str);
-                hex = str[3] + str[4];
-                vel = parseInt(str[6] + str[7], 16);
-                play(hex, vel);
+                if(connection) connection.send(s);  // 無加工のデータを相手にも送信する
+                hex = s.slice(3, 5)  // 入力キーを16進数(文字列型)として受け取る
+                vel = parseInt(s.slice(6, 8), 16);    // 入力キーの押す速さを10進数として受け取る
+                play(hex, vel); // 指定された音高と強さで再生する
             }
         }
 
+        // １バイトの16進数を音高に変換する
         function hex_to_note(hex){
             t = parseInt(hex, 16)-21;
             res = "ABBCDDEEFGGA"[t%12];
@@ -66,6 +135,8 @@
             return res
         }
 
+        // ↓------------------------------- 音声処理系 -------------------------------↓
+
         // 最初にサンプラー音源を取得
         const sampler = new Tone.Sampler({
             urls: {
@@ -74,84 +145,12 @@
             baseUrl: "https://f.easyuploader.app/eu-prd/upload/",
         }).toDestination();
 
+        // 指定された音高と強さでサンプラー音源を再生する
         function play(hex, vel){
             velocity = parseInt(vel, 16);
             if(velocity > 0){
                 sampler.triggerAttackRelease(hex_to_note(hex), 6, Tone.context.currentTime, Math.min(velocity*velocity/2000, 4));
             }
-        }
-
-        // 部屋作成ボタン押下時
-        document.getElementById('button_create').onclick = () => {
-            // 部屋(Peer)作成
-            const peer = new Peer(String(Math.floor(Math.random()*900000+100000)), {
-                key: '59214ca8-9cee-4bde-b61d-3d7343c52205',
-                debug: 3
-            });
-
-            // 作成成功時
-            peer.on('open', () => {
-                document.getElementById('my_id').textContent = "RoomID: " + peer.id;
-                button_create.remove();
-                input_id.remove();
-                button_join.remove();
-            });
-
-            // 誰かが入室してきたとき
-            peer.on('connection', conn => {
-                conn.on('open', () => {
-                    connection.send("Hello World");
-                });
-
-                // データ受信時
-                conn.on('data', data => {
-                    console.log(data);
-                });
-
-                connection = conn;
-            });
-        };
-
-        // 入室ボタン押下時
-        document.getElementById('button_join').onclick = () => {
-            let room_id = document.getElementById('input_id').value;
-
-            // Peer作成
-            const peer = new Peer({
-                key: '59214ca8-9cee-4bde-b61d-3d7343c52205',
-                debug: 3
-            });
-
-            // Peer作成成功時
-            peer.on('open', () => {
-                // 該当する部屋(Peer)へ入室
-                connection = peer.connect(room_id);
-
-                connection.on('open', () => {
-                    document.getElementById('my_id').textContent = "RoomID: " + room_id;
-                    button_create.remove();
-                    input_id.remove();
-                    button_join.remove();
-                });
-
-                // 接続失敗時
-                peer.on('error', error => {
-                    alert("RoomID: " + room_id + " doesn't exsist.");
-                    document.location.reload();
-                });
-
-                // データ受信時
-                connection.on('data', data => {
-                    console.log(data);
-                    hex = data[3] + data[4];
-                    vel = parseInt(data[6] + data[7], 16);
-                    if(data[0] != '8') play(hex, vel);
-                });
-            })
-        };
-
-        function send(data){
-            connection.send(data);
         }
     </script>
 </html>
