@@ -8,6 +8,7 @@
     </head>
     <body>
         <p id="roomid"></p>
+        <div id="note"></div>
 
         <input type="button" id="button_create" value="Create Room">
         <input type="text" id="input_roomid" placeholder="Room ID">
@@ -74,13 +75,14 @@
 
                 // 接続失敗時
                 peer.on('error', error => {
-                    alert("RoomID: " + roomid + " doesn't exsist.");
+                    alert("RoomID: " + roomid + " の部屋は存在していません : " + error);
                     document.location.reload();
                 });
 
                 // データ受信時
                 connection.on('data', data => {
                     hex = data.slice(3, 5);
+                    document.getElementById('note').innerHTML = hex;
                     vel = parseInt(data.slice(6, 8), 16);
                     if(data[0] != '8') play(hex, vel);
                 });
