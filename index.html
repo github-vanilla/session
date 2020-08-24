@@ -5,13 +5,93 @@
         <title>MIDI Live</title>
         <script src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.43/Tone.js"></script>
+        <style>
+            *, *::before, *::after {
+                box-sizing: border-box;
+            }
+
+            body {
+                background-color: #fff;
+                margin: 0;
+            }
+
+            .keyboard {
+                position: fixed;
+                bottom: 0;
+                display: flex;
+                width: 100%;
+                height: 15%;
+            }
+
+            .white {
+                width: var(--width);
+                --width: 40px;
+                height: 100%;
+                background-color: #fff;
+                border: 1px solid #ffa6a6;
+                border-bottom: 0;
+                margin: 0 -1px;
+            }
+
+            .black {
+                width: var(--width);
+                --width: 20px;
+                height: 60%;
+                background-color: #ffa6a6;
+                margin: 0 calc(var(--width) / -2);
+                z-index: 2;
+            }
+
+            .noteon {
+                background-color: #f55f5f;
+                border-color: #f55f5f;
+            }
+
+
+            :focus {
+                outline: none;
+            }
+
+            button {
+                border: 1px solid #f55f5f;
+                color: #fff;
+                background-color: #f55f5f;
+                padding: 8px;
+            }
+            
+            button:hover {
+                background-color: #f55f5f;
+                transition: 0.1s;
+                cursor: pointer;
+            }
+
+            input[type="text"] {
+                border: 1px solid #f55f5f;
+                color: #f55f5f;
+                background-color: #fff;
+                padding: 8px;
+                margin-left: 16px;
+            }
+
+            input::placeholder {
+                color: #f55f5f;
+            }
+
+            #peerid {
+                color: #f55f5f;
+                margin-left: 16px;
+                font-size: 24px;
+            }
+        </style>
     </head>
     <body>
         <p id="peerid"></p>
 
-        <input type="button" id="button_create" value="Create Room">
-        <input type="text" id="input_peerid" placeholder="Room ID">
-        <input type="button" id="button_join" value="Join">
+        <button id="button_create" style="margin-left: 16px;">Create Room</button>
+        <input id="input_peerid" class="effect-1" type="text" placeholder="Room ID">
+        <button id="button_join">Join</button>
+
+		<div id="keyboard" class="keyboard"></div>
     </body>
 
     <script>
@@ -22,8 +102,23 @@
         let text_peerid = document.getElementById("input_peerid");      // peerID入力フィールド
         let button_join = document.getElementById("button_join");       // 部屋参加ボタン
 
-        // P2Pの接続状態をグローバル変数で保持
+        // P2Pの接続状態
         let connection;
+        
+        // 全ての音高
+        let hex_to_note = {"15":"A0","16":"Bb0","17":"B0","18":"C1","19":"Db1","1a":"D1","1b":"Eb1","1c":"E1","1d":"F1","1e":"Gb1","1f":"G1","20":"Ab1","21":"A1","22":"Bb1","23":"B1","24":"C2","25":"Db2","26":"D2","27":"Eb2","28":"E2","29":"F2","2a":"Gb2","2b":"G2","2c":"Ab2","2d":"A2","2e":"Bb2","2f":"B2","30":"C3","31":"Db3","32":"D3","33":"Eb3","34":"E3","35":"F3","36":"Gb3","37":"G3","38":"Ab3","39":"A3","3a":"Bb3","3b":"B3","3c":"C4","3d":"Db4","3e":"D4","3f":"Eb4","40":"E4","41":"F4","42":"Gb4","43":"G4","44":"Ab4","45":"A4","46":"Bb4","47":"B4","48":"C5","49":"Db5","4a":"D5","4b":"Eb5","4c":"E5","4d":"F5","4e":"Gb5","4f":"G5","50":"Ab5","51":"A5","52":"Bb5","53":"B5","54":"C6","55":"Db6","56":"D6","57":"Eb6","58":"E6","59":"F6","5a":"Gb6","5b":"G6","5c":"Ab6","5d":"A6","5e":"Bb6","5f":"B6","60":"C7","61":"Db7","62":"D7","63":"Eb7","64":"E7","65":"F7","66":"Gb7","67":"G7","68":"Ab7","69":"A7","6a":"Bb7","6b":"B7","6c":"C8"};
+        let notes = [];
+
+        // ↓------------------------------- 初期化処理 -------------------------------↓
+
+        for(var i = 21; i < 109; i++) notes.push(hex_to_note[i.toString(16)]);
+
+        keyboard = document.getElementById("keyboard");
+        for(var i = 0; i < 88; i++){
+            if(notes[i].length > 2) keyboard.innerHTML += "<div id='key_"+notes[i]+"' class='black'></div>";
+            else keyboard.innerHTML += "<div id='key_"+notes[i]+"' class='white'></div>";
+        }
+
 
         // ↓------------------------------- ネットワーク系 -------------------------------↓
 
@@ -44,13 +139,9 @@
             });
 
             // 他のPeerが接続してきたとき
-            /*peer.on("connection", conn => {
-                connection = conn;
-            });*/
             peer.on('connection', conn => {
                 // データ受信時
                 conn.on('data', data => {
-                    console.log(data);
                     play(data);
                 });
 
@@ -89,7 +180,6 @@
 
                 // データ受信時
                 connection.on("data", data => {
-                    console.log(data);
                     play(data);
                 });
             })
@@ -129,18 +219,6 @@
             }
         }
 
-        // １バイトの16進数を音高に変換する
-        function hex_to_note(hex){
-            t = parseInt(hex, 16)-21;
-            res = "ABBCDDEEFGGA"[t%12];
-            if([1, 4, 6, 9, 11].includes(t%12)) res += 'b';
-            if(t < 3) res += '0';
-            else if(t > 86) res += '8';
-            else if(res[0] != 'B') res += String(Math.ceil(t/12));
-            else res += String(Math.ceil(t/12)-1);
-            return res
-        }
-
         // ↓------------------------------- 音声処理系 -------------------------------↓
 
         // 最初にサンプラー音源を取得
@@ -157,27 +235,21 @@
         function play(data){
             if(data[0] == 'b'){     // サステインペダル押下時
                 sustain = parseInt(data.slice(6, 8), 16) > 0;
-                if(!sustain) sampler.triggerRelease(allnotes(), Tone.context.currentTime);
+                if(!sustain) sampler.triggerRelease(notes, Tone.context.currentTime);
             }else{                  // キー入力時
                 hex = data.slice(3, 5);
                 vel = parseInt(data.slice(6, 8), 16);
-                if(data[0] != '8' && vel != 0) sampler.triggerAttack(hex_to_note(hex), Tone.context.currentTime, Math.min(vel*vel/2000, 4));
-                else if(!sustain) sampler.triggerRelease(hex_to_note(hex), Tone.context.currentTime);
+                key = document.getElementById("key_" + hex_to_note[hex]);
+                if(data[0] != '8' && vel != 0){
+                    key.classList.add("noteon");
+                    sampler.triggerAttack(hex_to_note[hex], Tone.context.currentTime, Math.min(vel*vel/2000, 4));
+                }else if(!sustain){
+                    key.classList.remove("noteon");
+                    sampler.triggerRelease(hex_to_note[hex], Tone.context.currentTime);
+                }else{
+                    key.classList.remove("noteon");
+                }
             }
-        }
-
-        function allnotes(){
-            res = [];
-            for(var t = 0; t < 88; t++){
-                note = "ABBCDDEEFGGA"[t%12];
-                if([1, 4, 6, 9, 11].includes(t%12)) note += "b";
-                if(t < 3) note += "0";
-                else if(t > 86) note += "8";
-                else if(res[0] != 'B') note += String(Math.ceil(t/12));
-                else note += String(Math.ceil(t/12)-1);
-                res.push(note);
-            }
-            return res;
         }
     </script>
 </html>
