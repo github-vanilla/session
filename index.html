@@ -5,13 +5,14 @@
         <title>MIDI Live</title>
         <script src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.43/Tone.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js" integrity="sha512-WIklPM6qPCIp6d3fSSr90j+1unQHUOoWDS4sdTiR8gxUTnyZ8S2Mr8e10sKKJ/bhJgpAa/qG068RDkg6fIlNFA==" crossorigin="anonymous"></script>
         <style>
             *, *::before, *::after {
                 box-sizing: border-box;
             }
 
             body {
-                background-color: #14151F;
+                background-color: rgb(15, 15, 15);
                 margin: 0;
             }
 
@@ -28,7 +29,7 @@
                 --width: 40px;
                 height: 100%;
                 background-color: #fff;
-                border: 1px solid #ffa6a6;
+                border: 1px solid rgb(15, 15, 15);
                 border-bottom: 0;
                 margin: 0 -1px;
             }
@@ -37,60 +38,65 @@
                 width: var(--width);
                 --width: 20px;
                 height: 60%;
-                background-color: #ffa6a6;
+                background-color: rgb(15, 15, 15);
                 margin: 0 calc(var(--width) / -2);
                 z-index: 2;
             }
 
             .noteon {
-                background-color: #f55f5f;
-                border-color: #f55f5f;
+                background-color: #838383;
+                border-color: #838383;
             }
-
 
             :focus {
                 outline: none;
             }
 
             button {
-                border: 1px solid #f55f5f;
+                border: 1px solid #fff;
                 color: #fff;
-                background-color: #f55f5f;
+                background-color: rgb(15, 15, 15);
                 padding: 8px;
             }
             
             button:hover {
-                background-color: #f55f5f;
-                transition: 0.1s;
                 cursor: pointer;
             }
 
             input[type="text"] {
-                border: 1px solid #f55f5f;
-                color: #f55f5f;
-                background-color: #fff;
+                border-radius: 0px;
+                border: 1px solid #fff;
+                color: #fff;
+                background-color: rgb(15, 15, 15);
                 padding: 8px;
                 margin-left: 16px;
             }
 
-            input::placeholder {
-                color: #f55f5f;
+            input[type="text"]::placeholder {
+                color: #fff;
+            }
+            
+            .visualization {
+                position: absolute;
+                top: calc(50% - 100vh/3);
+                left: calc(50% - 100vh/3);
             }
 
             #peerid {
-                color: #f55f5f;
+                color: #fff;
                 margin-left: 16px;
                 font-size: 24px;
             }
+
         </style>
     </head>
     <body>
         <p id="peerid"></p>
 
         <button id="button_create" style="margin-left: 16px;">Create Room</button>
-        <input id="input_peerid" class="effect-1" type="text" placeholder="Room ID">
+        <input id="input_peerid" class="effect-1" type="text" placeholder="ID">
         <button id="button_join">Join</button>
-
+        <div id="visualization" class="visualization"></div>
 		<div id="keyboard" class="keyboard"></div>
     </body>
 
@@ -132,7 +138,7 @@
 
             // Peer作成成功時
             peer.on("open", () => {
-                document.getElementById('peerid').textContent = "RoomID: " + peer.id;
+                document.getElementById('peerid').textContent = peer.id;
                 button_create.remove();
                 text_peerid.remove();
                 button_join.remove();
@@ -166,7 +172,7 @@
 
                 // Peer接続成功時
                 connection.on("open", ()  => {
-                    document.getElementById("peerid").textContent = "RoomID: " + peerid;
+                    document.getElementById("peerid").textContent = peerid;
                     button_create.remove();
                     text_peerid.remove();
                     button_join.remove();
@@ -250,6 +256,51 @@
                     key.classList.remove("noteon");
                 }
             }
+        }
+
+        // ↓------------------------------- 描画系 -------------------------------↓
+
+        const map = (value, fromMin, fromMax, toMin, toMax) => {
+            let result = 0;
+            result = (value <= fromMin)
+            ? toMin : (value >= fromMax)
+                ? toMax : (() => {
+                    let ratio = (toMax - toMin) / (fromMax - fromMin);
+                    return (value - fromMin) * ratio + toMin;
+                })();
+            return result;
+        };
+
+        function sum(arr){
+            res = 0;
+            arr.forEach(function(e) {
+                res += e;
+            });
+            return res;
+        };
+
+        async function setup(){
+            canvasSize = windowHeight / 1.5;
+            canvas = createCanvas(canvasSize, canvasSize);
+            canvas.parent("visualization");
+
+            meter = new Tone.Meter();
+            sampler.connect(meter);
+
+            stroke(255);
+            strokeWeight(4);
+            noFill();
+        }
+
+        levels = Array(5).fill(0);
+
+        function draw(){
+            background(15, 15, 15)
+            level = map(meter.getValue(), -50, 0, 0, 1);
+            levels.push(level);
+            levels.shift();
+            ave = sum(levels)/levels.length;
+            if(ave != 0) ellipse(canvasSize/2, canvasSize/2, ave*canvasSize, ave*canvasSize);
         }
     </script>
 </html>
