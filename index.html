@@ -270,6 +270,7 @@
         sustain = false;
 
         function play(data){
+            console.log(data);
             if(data[0] == 'b'){     // サステインペダル押下時
                 sustain = parseInt(data.slice(6, 8), 16) > 0;
                 if(!sustain) sampler.triggerRelease(notes, Tone.context.currentTime);
